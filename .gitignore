@@ -161,3 +161,11 @@ cython_debug/
 
 # Local Models
 /Langboat/bloom-800m-zh
+
+# Train Data
+/train_data/*
+!/train_data/.keep
+
+# Model Output
+/train_output/*
+!/train_output/.keep
