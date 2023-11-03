@@ -1,6 +1,6 @@
 import json
 import pathlib
-from typing import Dict, Callable
+from typing import Dict, Callable, Optional
 
 from datasets import load_dataset, DownloadConfig
 
@@ -24,15 +24,19 @@ def clean_token_surroundings(s: str) -> str:
     return s
 
 
-def convert_row_instruction(row: Dict) -> Dict:
-    content: str = row['instruction'] + row['output']
-    content = content.replace('Human:', TOKEN_HUMAN)
-    content = content.replace('Assistant:', TOKEN_ASSISTANT)
-    content = clean_token_surroundings(content)
-    return {'text': content}
+def convert_row_instruction(row: Dict) -> Optional[Dict]:
+    if 'input' in row and row['input']:
+        return None
+    instruction: str = row['instruction']
+    instruction = instruction.replace('Human:', TOKEN_HUMAN)
+    instruction = instruction.replace('Assistant:', TOKEN_ASSISTANT)
+    instruction = clean_token_surroundings(instruction)
+    output: str = row['output']
+    output = output.strip()
+    return {'instruction': instruction, 'output': output}
 
 
-def save_dataset(dir_train_data: pathlib.Path, name: str, convert: Callable[[Dict], Dict]):
+def save_dataset(name: str, convert: Callable[[Dict], Dict]):
     train_data_file = name.replace('/', '--') + '.jsonl'
     dataset = load_dataset(
         name,
@@ -41,12 +45,15 @@ def save_dataset(dir_train_data: pathlib.Path, name: str, convert: Callable[[Dic
     )
     with open(dir_train_data / train_data_file, 'w') as f:
         for row in dataset:
-            json.dump(convert(row), f, ensure_ascii=False)
+            data = convert(row)
+            if not data:
+                continue
+            json.dump(data, f, ensure_ascii=False)
             f.write('\r\n')
 
 
 def main():
-    save_dataset(dir_train_data, 'BelleGroup/multiturn_chat_0.8M', convert=convert_row_instruction)
+    save_dataset('BelleGroup/multiturn_chat_0.8M', convert=convert_row_instruction)
 
 
 if __name__ == '__main__':
