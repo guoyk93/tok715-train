@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "tok715-train"
+version = "0.1.0"
+description = "model training for tok715"
+authors = ["GUO YANKE <hi@guoyk.xyz>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+transformers = "^4.35.0"
+torch = "^2.1.0"
+safetensors = "^0.4.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
