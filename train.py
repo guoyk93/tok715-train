@@ -89,7 +89,7 @@ def main(opt_base_model: str):
     ]))
     train_dataset = load_dataset('json', data_files=data_files, split='train')
 
-    def map_train_dataset_row(batched_rows: Dict) -> any:
+    def map_train_dataset_batched_rows(batched_rows: Dict) -> any:
         input_output = preprocess_train_dataset_data(
             sources=batched_rows['instruction'],
             targets=[output + tokenizer.eos_token for output in batched_rows['output']],
@@ -99,7 +99,11 @@ def main(opt_base_model: str):
             labels=input_output['labels'],
         )
 
-    train_dataset = train_dataset.map(map_train_dataset_row, batched=True, num_proc=4)
+    train_dataset = train_dataset.map(
+        map_train_dataset_batched_rows,
+        batched=True,
+        num_proc=8,
+    )
 
     # train args
     args = TrainingArguments(
