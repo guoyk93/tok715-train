@@ -6,7 +6,7 @@ import click
 import torch
 from datasets import load_dataset
 from transformers import TrainingArguments, Trainer, DataCollatorForSeq2Seq, \
-    AutoModelForCausalLM, AutoTokenizer
+    BloomTokenizerFast, BloomForCausalLM
 
 from prepare import ALL_TOKENS, dir_train_data
 
@@ -23,16 +23,16 @@ IGNORE_INDEX = -100
     type=str,
 )
 def main(opt_base_model: str):
-    tokenizer = AutoTokenizer.from_pretrained(
+    tokenizer = BloomTokenizerFast.from_pretrained(
         opt_base_model,
-        padding_side="right",
     )
+    tokenizer.padding_side = 'right'
+    assert tokenizer.pad_token_id
 
-    model = AutoModelForCausalLM.from_pretrained(
+    model = BloomForCausalLM.from_pretrained(
         opt_base_model,
         device_map='auto',
         torch_dtype=torch.bfloat16,
-        trust_remote_code=True,
     ).eval()
 
     # add extra tokens
@@ -74,30 +74,32 @@ def main(opt_base_model: str):
             targets: Sequence[str],
     ) -> Dict:
         examples = [s + t for s, t in zip(sources, targets)]
-        examples_tokenized, sources_tokenized = [
-            tokenize_train_dataset_data(strings) for strings in (examples, sources)
-        ]
-        input_ids = examples_tokenized["input_ids"]
-        labels = copy.deepcopy(input_ids)
-        for label, source_len in zip(labels, sources_tokenized["input_ids_lens"]):
+        examples_tokenized, sources_tokenized = (
+            tokenize_train_dataset_data(examples),
+            tokenize_train_dataset_data(sources)
+        )
+        examples_input_ids = examples_tokenized["input_ids"]
+        examples_labels = copy.deepcopy(examples_input_ids)
+        for label, source_len in zip(examples_labels, sources_tokenized["input_ids_lens"]):
             label[:source_len] = IGNORE_INDEX
-        return dict(input_ids=input_ids, labels=labels)
+        return dict(input_ids=examples_input_ids, labels=examples_labels)
 
     data_files = list(filter(lambda x: x.endswith('.jsonl'), [
         str(f) for f in dir_train_data.iterdir()
     ]))
     train_dataset = load_dataset('json', data_files=data_files, split='train')
 
-    def map_train_dataset(row: Dict) -> any:
+    def map_train_dataset_row(batched_rows: Dict) -> any:
         input_output = preprocess_train_dataset_data(
-            sources=[row['instruction']],
-            targets=[row['output']],
+            sources=batched_rows['instruction'],
+            targets=[output + tokenizer.eos_token for output in batched_rows['output']],
         )
-        row['input_ids'] = input_output['input_ids']
-        row['labels'] = input_output['labels']
-        return row
+        return dict(
+            input_ids=input_output['input_ids'],
+            labels=input_output['labels'],
+        )
 
-    train_dataset = train_dataset.map(map_train_dataset)  # , batched=True, num_proc=2)
+    train_dataset = train_dataset.map(map_train_dataset_row, batched=True, num_proc=4)
 
     # train args
     args = TrainingArguments(
