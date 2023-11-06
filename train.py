@@ -31,7 +31,7 @@ def main(opt_base_model: str):
 
     model = BloomForCausalLM.from_pretrained(
         opt_base_model,
-        device_map='auto',
+        device_map='cuda',
         torch_dtype=torch.bfloat16,
     ).eval()
 
@@ -109,17 +109,17 @@ def main(opt_base_model: str):
     args = TrainingArguments(
         output_dir=str(dir_train_output),
         num_train_epochs=3,
+        learning_rate=2e-5,
         bf16=False,
-        per_device_train_batch_size=1,
-        per_gpu_eval_batch_size=1,
+        tf32=False,
+        per_device_train_batch_size=10,
+        per_device_eval_batch_size=6,
         gradient_accumulation_steps=8,
         evaluation_strategy='no',
         save_strategy='steps',
-        save_steps=20,
+        save_steps=2000,
         save_total_limit=10,
-        learning_rate=2e-5,
-        logging_steps=10,
-        tf32=False,
+        logging_steps=100,
     )
 
     # trainer
